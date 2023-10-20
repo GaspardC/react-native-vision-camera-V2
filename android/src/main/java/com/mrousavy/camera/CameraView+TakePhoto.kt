@@ -65,8 +65,8 @@ suspend fun CameraView.takePhoto(options: ReadableMap): WritableMap = coroutineS
   val camera2Info = Camera2CameraInfo.from(camera!!.cameraInfo)
   val lensFacing = camera2Info.getCameraCharacteristic(CameraCharacteristics.LENS_FACING)
 
-  val folder = options["folder"] as? String
-  val filename = options["filename"] as? String
+  val folder = options.getString("folder") 
+  val filename = options.getString("filename")
 
   val results = awaitAll(
     async(coroutineContext) {
