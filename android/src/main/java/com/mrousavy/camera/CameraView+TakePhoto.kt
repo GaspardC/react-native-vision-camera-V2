@@ -78,16 +78,17 @@ suspend fun CameraView.takePhoto(options: ReadableMap): WritableMap = coroutineS
       pic
     },
     async(Dispatchers.IO) {
-      Log.d(CameraView.TAG, "Creating temp file...")
       if(folder != null && filename != null) {
-     // save file to files directory in folder (create if do not exist) with filename
+         // save file to files directory in folder (create if do not exist) with filename
+        Log.d(CameraView.TAG, "Creating persisting file...")
         File(context.filesDir, folder).apply { mkdirs() }
         val fileWithExtension = if (filename.endsWith(".jpg")) filename else "$filename.jpg"
         File(context.filesDir, "$folder/$fileWithExtension").apply { 
             createNewFile()
         }
       } else {
-      File.createTempFile("mrousavy", ".jpg", context.cacheDir).apply { deleteOnExit() }
+        Log.d(CameraView.TAG, "Creating temp file...")
+        File.createTempFile("mrousavy", ".jpg", context.cacheDir).apply { deleteOnExit() }
       }
     }
   )

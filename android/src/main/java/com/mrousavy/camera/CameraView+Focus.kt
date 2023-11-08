@@ -22,7 +22,8 @@ suspend fun CameraView.focus(pointMap: ReadableMap) {
   }
 
   val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
-    .setAutoCancelDuration(120, TimeUnit.SECONDS) // auto-reset after 5 seconds
+    // .setAutoCancelDuration(120, TimeUnit.SECONDS) // auto-reset after 5 seconds
+    .disableAutoCancel()
     .build()
 
   cameraControl.startFocusAndMetering(action).await()
