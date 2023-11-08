@@ -82,7 +82,8 @@ suspend fun CameraView.takePhoto(options: ReadableMap): WritableMap = coroutineS
       if(folder != null && filename != null) {
      // save file to files directory in folder (create if do not exist) with filename
         File(context.filesDir, folder).apply { mkdirs() }
-        File(context.filesDir, "$folder/$filename.jpg").apply { 
+        val fileWithExtension = if (filename.endsWith(".jpg")) filename else "$filename.jpg"
+        File(context.filesDir, "$folder/$fileWithExtension").apply { 
             createNewFile()
         }
       } else {
