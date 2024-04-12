@@ -12,7 +12,12 @@ private fun makeErrorCauseMap(throwable: Throwable): ReadableMap {
   return map
 }
 
-fun makeErrorMap(code: String? = null, message: String? = null, throwable: Throwable? = null, userInfo: WritableMap? = null): ReadableMap {
+fun makeErrorMap(
+  code: String? = null,
+  message: String? = null,
+  throwable: Throwable? = null,
+  userInfo: WritableMap? = null,
+): ReadableMap {
   val map = Arguments.createMap()
   map.putString("code", code)
   map.putString("message", message)

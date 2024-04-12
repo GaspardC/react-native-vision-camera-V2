@@ -24,7 +24,6 @@ import androidx.lifecycle.*
 import com.facebook.jni.HybridData
 import com.facebook.proguard.annotations.DoNotStrip
 import com.facebook.react.bridge.*
-import com.facebook.react.uimanager.events.RCTEventEmitter
 import com.mrousavy.camera.frameprocessor.FrameProcessorPerformanceDataCollector
 import com.mrousavy.camera.frameprocessor.FrameProcessorRuntimeManager
 import com.mrousavy.camera.utils.*
@@ -82,17 +81,20 @@ class CameraView(context: Context, private val frameProcessorThread: ExecutorSer
   var enableDepthData = false
   var enableHighQualityPhotos: Boolean? = null
   var enablePortraitEffectsMatteDelivery = false
+
   // use-cases
   var photo: Boolean? = null
   var video: Boolean? = null
   var audio: Boolean? = null
   var enableFrameProcessor = false
+
   // props that require format reconfiguring
   var format: ReadableMap? = null
   var fps: Int? = null
   var hdr: Boolean? = null // nullable bool
   var colorSpace: String? = null
   var lowLightBoost: Boolean? = null // nullable bool
+
   // other props
   var isActive = false
   var torch = "off"
@@ -219,38 +221,43 @@ class CameraView(context: Context, private val frameProcessorThread: ExecutorSer
     previewView.installHierarchyFitter() // If this is not called correctly, view finder will be black/blank
     addView(previewView)
 
-    scaleGestureListener = object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-      override fun onScale(detector: ScaleGestureDetector): Boolean {
-        zoom = max(min((zoom * detector.scaleFactor), maxZoom), minZoom)
-        update(arrayListOfZoom)
-        return true
+    scaleGestureListener =
+      object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScale(detector: ScaleGestureDetector): Boolean {
+          zoom = max(min((zoom * detector.scaleFactor), maxZoom), minZoom)
+          update(arrayListOfZoom)
+          return true
+        }
       }
-    }
     scaleGestureDetector = ScaleGestureDetector(context, scaleGestureListener)
     touchEventListener = OnTouchListener { _, event -> return@OnTouchListener scaleGestureDetector.onTouchEvent(event) }
 
     hostLifecycleState = Lifecycle.State.INITIALIZED
     lifecycleRegistry = LifecycleRegistry(this)
-    reactContext.addLifecycleEventListener(object : LifecycleEventListener {
-      override fun onHostResume() {
-        hostLifecycleState = Lifecycle.State.RESUMED
-        updateLifecycleState()
-        // workaround for https://issuetracker.google.com/issues/147354615, preview must be bound on resume
-        update(propsThatRequireSessionReconfiguration)
-      }
-      override fun onHostPause() {
-        hostLifecycleState = Lifecycle.State.CREATED
-        updateLifecycleState()
-      }
-      override fun onHostDestroy() {
-        hostLifecycleState = Lifecycle.State.DESTROYED
-        updateLifecycleState()
-        cameraExecutor.shutdown()
-        takePhotoExecutor.shutdown()
-        recordVideoExecutor.shutdown()
-        reactContext.removeLifecycleEventListener(this)
-      }
-    })
+    reactContext.addLifecycleEventListener(
+      object : LifecycleEventListener {
+        override fun onHostResume() {
+          hostLifecycleState = Lifecycle.State.RESUMED
+          updateLifecycleState()
+          // workaround for https://issuetracker.google.com/issues/147354615, preview must be bound on resume
+          update(propsThatRequireSessionReconfiguration)
+        }
+
+        override fun onHostPause() {
+          hostLifecycleState = Lifecycle.State.CREATED
+          updateLifecycleState()
+        }
+
+        override fun onHostDestroy() {
+          hostLifecycleState = Lifecycle.State.DESTROYED
+          updateLifecycleState()
+          cameraExecutor.shutdown()
+          takePhotoExecutor.shutdown()
+          recordVideoExecutor.shutdown()
+          reactContext.removeLifecycleEventListener(this)
+        }
+      },
+    )
   }
 
   override fun onConfigurationChanged(newConfig: Configuration?) {
@@ -267,6 +274,7 @@ class CameraView(context: Context, private val frameProcessorThread: ExecutorSer
   }
 
   private external fun initHybrid(): HybridData
+
   private external fun frameProcessorCallback(frame: ImageProxy)
 
   override fun getLifecycle(): Lifecycle {
@@ -313,39 +321,40 @@ class CameraView(context: Context, private val frameProcessorThread: ExecutorSer
   /**
    * Invalidate all React Props and reconfigure the device
    */
-  fun update(changedProps: ArrayList<String>) = previewView.post {
-    // TODO: Does this introduce too much overhead?
-    //  I need to .post on the previewView because it might've not been initialized yet
-    //  I need to use CoroutineScope.launch because of the suspend fun [configureSession]
-    coroutineScope.launch {
-      try {
-        val shouldReconfigureSession = changedProps.containsAny(propsThatRequireSessionReconfiguration)
-        val shouldReconfigureZoom = shouldReconfigureSession || changedProps.contains("zoom")
-        val shouldReconfigureTorch = shouldReconfigureSession || changedProps.contains("torch")
-        val shouldUpdateOrientation = shouldReconfigureSession ||  changedProps.contains("orientation")
+  fun update(changedProps: ArrayList<String>) =
+    previewView.post {
+      // TODO: Does this introduce too much overhead?
+      //  I need to .post on the previewView because it might've not been initialized yet
+      //  I need to use CoroutineScope.launch because of the suspend fun [configureSession]
+      coroutineScope.launch {
+        try {
+          val shouldReconfigureSession = changedProps.containsAny(propsThatRequireSessionReconfiguration)
+          val shouldReconfigureZoom = shouldReconfigureSession || changedProps.contains("zoom")
+          val shouldReconfigureTorch = shouldReconfigureSession || changedProps.contains("torch")
+          val shouldUpdateOrientation = shouldReconfigureSession || changedProps.contains("orientation")
 
-        if (changedProps.contains("isActive")) {
-          updateLifecycleState()
+          if (changedProps.contains("isActive")) {
+            updateLifecycleState()
+          }
+          if (shouldReconfigureSession) {
+            configureSession()
+          }
+          if (shouldReconfigureZoom) {
+            val zoomClamped = max(min(zoom, maxZoom), minZoom)
+            camera!!.cameraControl.setZoomRatio(zoomClamped)
+          }
+          if (shouldReconfigureTorch) {
+            camera!!.cameraControl.enableTorch(torch == "on")
+          }
+          if (shouldUpdateOrientation) {
+            updateOrientation()
+          }
+        } catch (e: Throwable) {
+          Log.e(TAG, "update() threw: ${e.message}")
+          invokeOnError(e)
         }
-        if (shouldReconfigureSession) {
-          configureSession()
-        }
-        if (shouldReconfigureZoom) {
-          val zoomClamped = max(min(zoom, maxZoom), minZoom)
-          camera!!.cameraControl.setZoomRatio(zoomClamped)
-        }
-        if (shouldReconfigureTorch) {
-          camera!!.cameraControl.enableTorch(torch == "on")
-        }
-        if (shouldUpdateOrientation) {
-          updateOrientation()
-        }
-      } catch (e: Throwable) {
-        Log.e(TAG, "update() threw: ${e.message}")
-        invokeOnError(e)
       }
     }
-  }
 
   /**
    * Configures the camera capture session. This should only be called when the camera device changes.
@@ -361,17 +370,18 @@ class CameraView(context: Context, private val frameProcessorThread: ExecutorSer
       if (cameraId == null) {
         throw NoCameraDeviceError()
       }
-      if (format != null)
+      if (format != null) {
         Log.i(TAG, "Configuring session with Camera ID $cameraId and custom format...")
-      else
+      } else {
         Log.i(TAG, "Configuring session with Camera ID $cameraId and default format options...")
+      }
 
       // Used to bind the lifecycle of cameras to the lifecycle owner
       val cameraProvider = ProcessCameraProvider.getInstance(reactContext).await()
 
       var cameraSelector = CameraSelector.Builder().byID(cameraId!!).build()
 
-      val tryEnableExtension: (suspend (extension: Int) -> Unit) = lambda@ { extension ->
+      val tryEnableExtension: (suspend (extension: Int) -> Unit) = lambda@{ extension ->
         if (extensionsManager == null) {
           Log.i(TAG, "Initializing ExtensionsManager...")
           extensionsManager = ExtensionsManager.getInstanceAsync(context, cameraProvider).await()
@@ -389,20 +399,24 @@ class CameraView(context: Context, private val frameProcessorThread: ExecutorSer
         }
       }
 
-      val previewBuilder = Preview.Builder()
-        .setTargetRotation(inputRotation)
+      val previewBuilder =
+        Preview.Builder()
+          .setTargetRotation(inputRotation)
 
-      val imageCaptureBuilder = ImageCapture.Builder()
-        .setTargetRotation(outputRotation)
-        .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+      val imageCaptureBuilder =
+        ImageCapture.Builder()
+          .setTargetRotation(outputRotation)
+          .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
 
-      val videoRecorderBuilder = Recorder.Builder()
-        .setExecutor(cameraExecutor)
+      val videoRecorderBuilder =
+        Recorder.Builder()
+          .setExecutor(cameraExecutor)
 
-      val imageAnalysisBuilder = ImageAnalysis.Builder()
-        .setTargetRotation(outputRotation)
-        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-        .setBackgroundExecutor(frameProcessorThread)
+      val imageAnalysisBuilder =
+        ImageAnalysis.Builder()
+          .setTargetRotation(outputRotation)
+          .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+          .setBackgroundExecutor(frameProcessorThread)
 
       if (format == null) {
         // let CameraX automatically find best resolution for the target aspect ratio
@@ -455,7 +469,6 @@ class CameraView(context: Context, private val frameProcessorThread: ExecutorSer
         }
       }
 
-
       // Unbind use cases before rebinding
       videoCapture = null
       imageCapture = null
@@ -474,8 +487,11 @@ class CameraView(context: Context, private val frameProcessorThread: ExecutorSer
       }
       if (photo == true) {
         if (fallbackToSnapshot) {
-          Log.i(TAG, "Tried to add photo use-case (`photo={true}`) but the Camera device only supports " +
-            "a single use-case at a time. Falling back to Snapshot capture.")
+          Log.i(
+            TAG,
+            "Tried to add photo use-case (`photo={true}`) but the Camera device only supports " +
+              "a single use-case at a time. Falling back to Snapshot capture.",
+          )
         } else {
           Log.i(TAG, "Adding ImageCapture use-case...")
           imageCapture = imageCaptureBuilder.build()
@@ -484,25 +500,26 @@ class CameraView(context: Context, private val frameProcessorThread: ExecutorSer
       }
       if (enableFrameProcessor) {
         Log.i(TAG, "Adding ImageAnalysis use-case...")
-        imageAnalysis = imageAnalysisBuilder.build().apply {
-          setAnalyzer(cameraExecutor, { image ->
-            val now = System.currentTimeMillis()
-            val intervalMs = (1.0 / actualFrameProcessorFps) * 1000.0
-            if (now - lastFrameProcessorCall > intervalMs) {
-              lastFrameProcessorCall = now
+        imageAnalysis =
+          imageAnalysisBuilder.build().apply {
+            setAnalyzer(cameraExecutor, { image ->
+              val now = System.currentTimeMillis()
+              val intervalMs = (1.0 / actualFrameProcessorFps) * 1000.0
+              if (now - lastFrameProcessorCall > intervalMs) {
+                lastFrameProcessorCall = now
 
-              val perfSample = frameProcessorPerformanceDataCollector.beginPerformanceSampleCollection()
-              frameProcessorCallback(image)
-              perfSample.endPerformanceSampleCollection()
-            }
-            image.close()
+                val perfSample = frameProcessorPerformanceDataCollector.beginPerformanceSampleCollection()
+                frameProcessorCallback(image)
+                perfSample.endPerformanceSampleCollection()
+              }
+              image.close()
 
-            if (isReadyForNewEvaluation) {
-              // last evaluation was more than a second ago, evaluate again
-              evaluateNewPerformanceSamples()
-            }
-          })
-        }
+              if (isReadyForNewEvaluation) {
+                // last evaluation was more than a second ago, evaluate again
+                evaluateNewPerformanceSamples()
+              }
+            })
+          }
         useCases.add(imageAnalysis!!)
       }
 

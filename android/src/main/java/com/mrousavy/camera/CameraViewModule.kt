@@ -15,20 +15,17 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.QualitySelector
 import androidx.core.content.ContextCompat
 import com.facebook.react.bridge.*
+import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.modules.core.PermissionAwareActivity
 import com.facebook.react.modules.core.PermissionListener
 import com.facebook.react.uimanager.UIManagerHelper
-import com.facebook.react.bridge.ReactApplicationContext
-import com.facebook.react.turbomodule.core.CallInvokerHolderImpl
-import com.mrousavy.camera.CameraView
-import com.mrousavy.camera.ViewNotFoundError
-import java.util.concurrent.ExecutorService
 import com.mrousavy.camera.frameprocessor.FrameProcessorRuntimeManager
 import com.mrousavy.camera.parsers.*
 import com.mrousavy.camera.utils.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.guava.await
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 @ReactModule(name = CameraViewModule.TAG)
@@ -85,12 +82,16 @@ class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBase
   private fun findCameraView(viewId: Int): CameraView {
     Log.d(TAG, "Finding view $viewId...")
     val view = if (reactApplicationContext != null) UIManagerHelper.getUIManager(reactApplicationContext, viewId)?.resolveView(viewId) as CameraView? else null
-    Log.d(TAG,  if (reactApplicationContext != null) "Found view $viewId!" else "Couldn't find view $viewId!")
+    Log.d(TAG, if (reactApplicationContext != null) "Found view $viewId!" else "Couldn't find view $viewId!")
     return view ?: throw ViewNotFoundError(viewId)
   }
 
   @ReactMethod
-  fun takePhoto(viewTag: Int, options: ReadableMap, promise: Promise) {
+  fun takePhoto(
+    viewTag: Int,
+    options: ReadableMap,
+    promise: Promise,
+  ) {
     coroutineScope.launch {
       withPromise(promise) {
         val view = findCameraView(viewTag)
@@ -101,7 +102,11 @@ class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBase
 
   @Suppress("unused")
   @ReactMethod
-  fun takeSnapshot(viewTag: Int, options: ReadableMap, promise: Promise) {
+  fun takeSnapshot(
+    viewTag: Int,
+    options: ReadableMap,
+    promise: Promise,
+  ) {
     coroutineScope.launch {
       withPromise(promise) {
         val view = findCameraView(viewTag)
@@ -112,7 +117,11 @@ class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBase
 
   // TODO: startRecording() cannot be awaited, because I can't have a Promise and a onRecordedCallback in the same function. Hopefully TurboModules allows that
   @ReactMethod
-  fun startRecording(viewTag: Int, options: ReadableMap, onRecordCallback: Callback) {
+  fun startRecording(
+    viewTag: Int,
+    options: ReadableMap,
+    onRecordCallback: Callback,
+  ) {
     coroutineScope.launch {
       val view = findCameraView(viewTag)
       try {
@@ -128,7 +137,10 @@ class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBase
   }
 
   @ReactMethod
-  fun pauseRecording(viewTag: Int, promise: Promise) {
+  fun pauseRecording(
+    viewTag: Int,
+    promise: Promise,
+  ) {
     withPromise(promise) {
       val view = findCameraView(viewTag)
       view.pauseRecording()
@@ -137,7 +149,10 @@ class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBase
   }
 
   @ReactMethod
-  fun resumeRecording(viewTag: Int, promise: Promise) {
+  fun resumeRecording(
+    viewTag: Int,
+    promise: Promise,
+  ) {
     withPromise(promise) {
       val view = findCameraView(viewTag)
       view.resumeRecording()
@@ -146,7 +161,10 @@ class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBase
   }
 
   @ReactMethod
-  fun stopRecording(viewTag: Int, promise: Promise) {
+  fun stopRecording(
+    viewTag: Int,
+    promise: Promise,
+  ) {
     withPromise(promise) {
       val view = findCameraView(viewTag)
       view.stopRecording()
@@ -155,7 +173,11 @@ class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBase
   }
 
   @ReactMethod
-  fun focus(viewTag: Int, point: ReadableMap, promise: Promise) {
+  fun focus(
+    viewTag: Int,
+    point: ReadableMap,
+    promise: Promise,
+  ) {
     coroutineScope.launch {
       withPromise(promise) {
         val view = findCameraView(viewTag)
@@ -176,38 +198,47 @@ class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBase
         val extensionsManager = ExtensionsManager.getInstanceAsync(reactApplicationContext, cameraProvider).await()
         ProcessCameraProvider.getInstance(reactApplicationContext).await()
 
-        val manager = reactApplicationContext.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
-          ?: throw CameraManagerUnavailableError()
+        val manager =
+          reactApplicationContext.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
+            ?: throw CameraManagerUnavailableError()
 
         val cameraDevices: WritableArray = Arguments.createArray()
 
-        manager.cameraIdList.filter{ id -> id.toIntOrNull() != null }.forEach loop@{ id ->
+        manager.cameraIdList.filter { id -> id.toIntOrNull() != null }.forEach loop@{ id ->
           val cameraSelector = CameraSelector.Builder().byID(id).build()
 
           val characteristics = manager.getCameraCharacteristics(id)
           val hardwareLevel = characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)!!
 
           val capabilities = characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)!!
-          val isMultiCam = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
-            capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA)
+          val isMultiCam =
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+              capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA)
           val deviceTypes = characteristics.getDeviceTypes()
 
           val cameraConfig = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)!!
           val lensFacing = characteristics.get(CameraCharacteristics.LENS_FACING)!!
           val hasFlash = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE)!!
           val maxScalerZoom = characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM)!!
-          val supportsDepthCapture = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-            capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_DEPTH_OUTPUT)
+          val supportsDepthCapture =
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+              capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_DEPTH_OUTPUT)
           val supportsRawCapture = capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_RAW)
           val isoRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)
           val digitalStabilizationModes = characteristics.get(CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES)
           val opticalStabilizationModes = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION)
-          val zoomRange = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
-            characteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE)
-          else null
-          val name = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-            characteristics.get(CameraCharacteristics.INFO_VERSION)
-          else null
+          val zoomRange =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+              characteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE)
+            } else {
+              null
+            }
+          val name =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+              characteristics.get(CameraCharacteristics.INFO_VERSION)
+            } else {
+              null
+            }
           val fpsRanges = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)!!
 
           val supportsHdr = extensionsManager.isExtensionAvailable(cameraSelector, ExtensionMode.HDR)
@@ -242,17 +273,19 @@ class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBase
           val supportedVideoResolutions: List<Size>
           val cameraInfos = cameraSelector.filter(cameraProvider.availableCameraInfos)
           if (cameraInfos.size > 0) {
-            supportedVideoResolutions = QualitySelector
-              .getSupportedQualities(cameraInfos[0])
-              .map { QualitySelector.getResolution(cameraInfos[0], it)!! }
+            supportedVideoResolutions =
+              QualitySelector
+                .getSupportedQualities(cameraInfos[0])
+                .map { QualitySelector.getResolution(cameraInfos[0], it)!! }
           } else {
             supportedVideoResolutions = emptyList()
           }
 
           // TODO: Optimize?
-          val maxImageOutputSize = cameraConfig.outputFormats
-            .flatMap { cameraConfig.getOutputSizes(it).toList() }
-            .maxByOrNull { it.width * it.height }!!
+          val maxImageOutputSize =
+            cameraConfig.outputFormats
+              .flatMap { cameraConfig.getOutputSizes(it).toList() }
+              .maxByOrNull { it.width * it.height }!!
 
           val formats = Arguments.createArray()
 
@@ -263,12 +296,13 @@ class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBase
               val isHighestPhotoQualitySupported = areUltimatelyEqual(size, maxImageOutputSize)
 
               // Get the number of seconds that each frame will take to process
-              val secondsPerFrame = try {
-                cameraConfig.getOutputMinFrameDuration(formatId, size) / 1_000_000_000.0
-              } catch (error: Throwable) {
-                Log.e(TAG, "Minimum Frame Duration for MediaRecorder Output cannot be calculated, format \"$formatName\" is not supported.")
-                null
-              }
+              val secondsPerFrame =
+                try {
+                  cameraConfig.getOutputMinFrameDuration(formatId, size) / 1_000_000_000.0
+                } catch (error: Throwable) {
+                  Log.e(TAG, "Minimum Frame Duration for MediaRecorder Output cannot be calculated, format \"$formatName\" is not supported.")
+                  null
+                }
 
               val frameRateRanges = Arguments.createArray()
               if (secondsPerFrame != null && secondsPerFrame > 0) {
@@ -363,14 +397,15 @@ class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBase
     val activity = reactApplicationContext.currentActivity
     if (activity is PermissionAwareActivity) {
       val currentRequestCode = RequestCode++
-      val listener = PermissionListener { requestCode: Int, _: Array<String>, grantResults: IntArray ->
-        if (requestCode == currentRequestCode) {
-          val permissionStatus = if (grantResults.isNotEmpty()) grantResults[0] else PackageManager.PERMISSION_DENIED
-          promise.resolve(parsePermissionStatus(permissionStatus))
-          return@PermissionListener true
+      val listener =
+        PermissionListener { requestCode: Int, _: Array<String>, grantResults: IntArray ->
+          if (requestCode == currentRequestCode) {
+            val permissionStatus = if (grantResults.isNotEmpty()) grantResults[0] else PackageManager.PERMISSION_DENIED
+            promise.resolve(parsePermissionStatus(permissionStatus))
+            return@PermissionListener true
+          }
+          return@PermissionListener false
         }
-        return@PermissionListener false
-      }
       activity.requestPermissions(arrayOf(Manifest.permission.CAMERA), currentRequestCode, listener)
     } else {
       promise.reject("NO_ACTIVITY", "No PermissionAwareActivity was found! Make sure the app has launched before calling this function.")
@@ -387,14 +422,15 @@ class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBase
     val activity = reactApplicationContext.currentActivity
     if (activity is PermissionAwareActivity) {
       val currentRequestCode = RequestCode++
-      val listener = PermissionListener { requestCode: Int, _: Array<String>, grantResults: IntArray ->
-        if (requestCode == currentRequestCode) {
-          val permissionStatus = if (grantResults.isNotEmpty()) grantResults[0] else PackageManager.PERMISSION_DENIED
-          promise.resolve(parsePermissionStatus(permissionStatus))
-          return@PermissionListener true
+      val listener =
+        PermissionListener { requestCode: Int, _: Array<String>, grantResults: IntArray ->
+          if (requestCode == currentRequestCode) {
+            val permissionStatus = if (grantResults.isNotEmpty()) grantResults[0] else PackageManager.PERMISSION_DENIED
+            promise.resolve(parsePermissionStatus(permissionStatus))
+            return@PermissionListener true
+          }
+          return@PermissionListener false
         }
-        return@PermissionListener false
-      }
       activity.requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), currentRequestCode, listener)
     } else {
       promise.reject("NO_ACTIVITY", "No PermissionAwareActivity was found! Make sure the app has launched before calling this function.")

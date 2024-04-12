@@ -16,7 +16,10 @@ import java.nio.ByteBuffer
 import kotlin.system.measureTimeMillis
 
 // TODO: Fix this flip() function (this outputs a black image)
-fun flip(imageBytes: ByteArray, imageWidth: Int): ByteArray {
+fun flip(
+  imageBytes: ByteArray,
+  imageWidth: Int,
+): ByteArray {
   // separate out the sub arrays
   var holder = ByteArray(imageBytes.size)
   var subArray = ByteArray(imageWidth)
@@ -81,7 +84,10 @@ fun flipImage(imageBytes: ByteArray): ByteArray {
   return stream.toByteArray()
 }
 
-fun ImageProxy.save(file: File, flipHorizontally: Boolean) {
+fun ImageProxy.save(
+  file: File,
+  flipHorizontally: Boolean,
+) {
   when (format) {
     // TODO: ImageFormat.RAW_SENSOR
     // TODO: ImageFormat.DEPTH_JPEG
@@ -93,9 +99,10 @@ fun ImageProxy.save(file: File, flipHorizontally: Boolean) {
       buffer.get(bytes)
 
       if (flipHorizontally) {
-        val milliseconds = measureTimeMillis {
-          bytes = flipImage(bytes)
-        }
+        val milliseconds =
+          measureTimeMillis {
+            bytes = flipImage(bytes)
+          }
         Log.i(CameraView.TAG_PERF, "Flipping Image took $milliseconds ms.")
       }
 

@@ -4,7 +4,10 @@ import com.facebook.react.bridge.Promise
 import com.mrousavy.camera.CameraError
 import com.mrousavy.camera.UnknownCameraError
 
-inline fun withPromise(promise: Promise, closure: () -> Any?) {
+inline fun withPromise(
+  promise: Promise,
+  closure: () -> Any?,
+) {
   try {
     val result = closure()
     promise.resolve(result)

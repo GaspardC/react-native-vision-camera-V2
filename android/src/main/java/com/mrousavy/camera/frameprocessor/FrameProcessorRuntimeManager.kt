@@ -57,7 +57,7 @@ class FrameProcessorRuntimeManager(context: ReactApplicationContext, frameProces
     Log.d(TAG, "Finding view $viewId...")
     val ctx = mContext?.get()
     val view = if (ctx != null) UIManagerHelper.getUIManager(ctx, viewId)?.resolveView(viewId) as CameraView? else null
-    Log.d(TAG,  if (view != null) "Found view $viewId!" else "Couldn't find view $viewId!")
+    Log.d(TAG, if (view != null) "Found view $viewId!" else "Couldn't find view $viewId!")
     return view ?: throw ViewNotFoundError(viewId)
   }
 
@@ -76,9 +76,12 @@ class FrameProcessorRuntimeManager(context: ReactApplicationContext, frameProces
   private external fun initHybrid(
     jsContext: Long,
     jsCallInvokerHolder: CallInvokerHolderImpl,
-    scheduler: VisionCameraScheduler
+    scheduler: VisionCameraScheduler,
   ): HybridData
+
   private external fun initializeRuntime()
+
   private external fun registerPlugin(plugin: FrameProcessorPlugin)
+
   private external fun installJSIBindings()
 }

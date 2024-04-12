@@ -4,7 +4,6 @@ import androidx.camera.core.FocusMeteringAction
 import com.facebook.react.bridge.ReadableMap
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.withContext
-import java.util.concurrent.TimeUnit
 
 suspend fun CameraView.focus(pointMap: ReadableMap) {
   val cameraControl = camera?.cameraControl ?: throw CameraNotReadyError()
@@ -17,14 +16,16 @@ suspend fun CameraView.focus(pointMap: ReadableMap) {
   val y = pointMap.getDouble("y") * dpi
 
   // Getting the point from the previewView needs to be run on the UI thread
-  val point = withContext(coroutineScope.coroutineContext) {
-    previewView.meteringPointFactory.createPoint(x.toFloat(), y.toFloat());
-  }
+  val point =
+    withContext(coroutineScope.coroutineContext) {
+      previewView.meteringPointFactory.createPoint(x.toFloat(), y.toFloat())
+    }
 
-  val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
-    // .setAutoCancelDuration(120, TimeUnit.SECONDS) // auto-reset after 5 seconds
-    .disableAutoCancel()
-    .build()
+  val action =
+    FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+      // .setAutoCancelDuration(120, TimeUnit.SECONDS) // auto-reset after 5 seconds
+      .disableAutoCancel()
+      .build()
 
   cameraControl.startFocusAndMetering(action).await()
 }

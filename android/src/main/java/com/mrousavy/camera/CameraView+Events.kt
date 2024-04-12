@@ -17,10 +17,11 @@ fun CameraView.invokeOnError(error: Throwable) {
   Log.e(CameraView.TAG, "invokeOnError(...):")
   error.printStackTrace()
 
-  val cameraError = when (error) {
-    is CameraError -> error
-    else -> UnknownCameraError(error)
-  }
+  val cameraError =
+    when (error) {
+      is CameraError -> error
+      else -> UnknownCameraError(error)
+    }
   val event = Arguments.createMap()
   event.putString("code", cameraError.code)
   event.putString("message", cameraError.message)
@@ -31,7 +32,10 @@ fun CameraView.invokeOnError(error: Throwable) {
   reactContext.getJSModule(RCTEventEmitter::class.java).receiveEvent(id, "cameraError", event)
 }
 
-fun CameraView.invokeOnFrameProcessorPerformanceSuggestionAvailable(currentFps: Double, suggestedFps: Double) {
+fun CameraView.invokeOnFrameProcessorPerformanceSuggestionAvailable(
+  currentFps: Double,
+  suggestedFps: Double,
+) {
   Log.e(CameraView.TAG, "invokeOnFrameProcessorPerformanceSuggestionAvailable(suggestedFps: $suggestedFps):")
 
   val event = Arguments.createMap()

@@ -15,6 +15,9 @@ val SizeF.bigger: Float
 val SizeF.smaller: Float
   get() = min(this.width, this.height)
 
-fun areUltimatelyEqual(size1: Size, size2: Size): Boolean {
+fun areUltimatelyEqual(
+  size1: Size,
+  size2: Size,
+): Boolean {
   return size1.width * size1.height == size2.width * size2.height
 }
